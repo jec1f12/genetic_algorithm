@@ -1,6 +1,7 @@
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import random
+import cPickle
 
 def chunks(l, n):
     n = max(1, n)
@@ -356,15 +357,89 @@ def check_previous_gens(new_mol_list):
     new_matches_sorted = sorted(new_matches_list, key=lambda x: (int(x.GetProp("_Name").split("_")[0])))
     return new_matches_sorted 
 
-def reorg_en_calc(energies):
-    '''calculate reorganisation energies from run results'''
-    result = []
-    sep_lists = chunks(energies, 2)
-    for molen in sep_lists:
-        print molen
-        x = (float(molen[1][1][1]) - float(molen[1][0][1])) 
-        y =  (float(molen[0][1][1]) - float(molen[0][0][1]))
-        re_ha = x + y
-        re_ev = re_ha *27.212
-        result.append((molen[0][0][0], re_ev))
-    return result
+def init_gen_dumper(p_name,mol_list):
+    '''dumps clean generation to pickle'''
+    dump_list = []
+    for m in mol_list:
+        name = m.GetProp("_Name")
+        pm = AllChem.PropertyMol(m)
+        pm.SetProp("_Name", name)
+        pm.SetProp("_Energy", None)
+        dump_list.append(pm)
+    cPickle.dump(dump_list, open(p_name, "w+"))
+
+def gen_loader(p_name):
+    '''loads up a generation from pickle'''
+    mol_name_list = []
+    name_list = cPickle.load( open(p_name, "rb" ) )
+    for mol in name_list:
+        temp_m = mol
+        mol_name_list.append(temp_m)
+    return mol_name_list
+
+def results_dumper(p_name,ml_sorted_by_en):
+    '''dumps gen results to pickle'''
+    gen_name = p_name.split(".")[0]
+    dump_list = []
+    for mol,en in ml_sorted_by_en:
+        name = mol.GetProp("_Name")
+        en = mol.GetProp("_Energy")
+        pm = AllChem.PropertyMol(mol)
+        pm.SetProp("_Name", name)
+        pm.SetProp("_Energy", en)
+        dump_list.append(pm)
+    cPickle.dump(dump_list, open(gen_name+"_results.p", "w+"))
+
+def new_gen_dumper(pop_size,ng,new_mols):
+    '''dumps new gen to pickle, keeping energies from matched molecules'''
+    dump_list = []
+    for m in new_mols:
+         name = m.GetProp("_Name")
+         try:
+             energy = m.GetProp("_Energy")
+         except KeyError:
+             en = "None"
+             energy = m.SetProp("_Energy", en)
+         pm = AllChem.PropertyMol(m)
+         pm.SetProp("_Name", name)
+         pm.SetProp("_Energy", energy)
+         dump_list.append(pm)
+    new_gen_name = str(pop_size)+"_"+str(ng+1)+"_gen.p"
+    cPickle.dump(dump_list, open(new_gen_name, "w+"))
+
+def result_matcher(gen_result,mol_name_list,maximise):
+    '''matches results from calcs with correct mols'''
+    mol_en = []
+    print gen_result
+    print mol_name_list
+    i = 0
+    for mol in mol_name_list:
+        if mol.GetProp("_Energy") == "None":
+            try:
+                print mol.GetProp("_Name"),gen_result[i]
+                mol.SetProp("_Energy",gen_result[i][1])
+                i += 1
+            except IndexError:
+                print "results list wrong length"
+        mol_en.append((mol,mol.GetProp("_Energy")))
+    if maximise == "True":
+        print " max = True"
+        ml_sorted_by_en = sorted(mol_en, key=lambda tup: float(tup[1]),reverse=True)
+    if maximise == "False":
+        print "max = False"
+        ml_sorted_by_en = sorted(mol_en, key=lambda tup: float(tup[1]))
+    return ml_sorted_by_en
+
+def make_pairs(crossover_mols):
+    '''makes pairs from ranked and selected mols, pairs first to last and so on'''
+    pairs_set = []
+    pairs = zip(crossover_mols[::1], crossover_mols[-1::-1])
+    for p in pairs:
+        if (p[0],p[1]) in pairs_set:
+            pass
+        if (p[1],p[0]) in pairs_set:
+            pass
+        else:
+            pairs_set.append((p[0],p[1]))
+    return pairs_set
+

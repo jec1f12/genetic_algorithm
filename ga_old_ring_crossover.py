@@ -2,7 +2,6 @@ import random
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import random
-
 def find_dummy_atoms(mol):
     '''finds the dummy atoms in a mol, returns atom ids'''
     dummy_atoms = []
@@ -31,7 +30,7 @@ def fragment_total(mol):
             print cut_pts
             cp = get_actual_cut_pts(tempmol,(x),cut_pts)
             print cp
-            frag = frag_mol(tempmol,cp,bf='n',n=x)
+            frag = frag_mol(tempmol,cp,bf='n')
             frags.append(frag[1])
             break
         if x == 0:
@@ -42,7 +41,7 @@ def fragment_total(mol):
         print cut_pts
         cp = get_actual_cut_pts(tempmol,1,cut_pts)
         print cp
-        frag = frag_mol(tempmol,cp,bf='n',n=1)
+        frag = frag_mol(tempmol,cp,bf='n')
         frags.append(frag[0])
         tempmol = frag[1]
     print len(frags)
@@ -98,7 +97,7 @@ def ring_fixer(cross_mol,parent_mol):
         actual_cp = get_actual_cut_pts(parent_mol,num_rings,cp)
         print actual_cp
         #add_ring_cp = get_actual_cut_pts(parent_mol,num_rings-1,cp)
-        additional_ring = frag_mol(parent_mol,actual_cp,bf='n',n=num_rings)[1]
+        additional_ring = frag_mol(parent_mol,actual_cp,bf='n')[1]
         #print Chem.MolToSmiles(cross_mol)
         #print Chem.MolToSmiles(additional_ring)
         te2_m = Chem.EditableMol(cross_mol)
@@ -125,7 +124,7 @@ def ring_fixer(cross_mol,parent_mol):
         cp_tup = [(cut_at,cut_pt) for cut_at,cut_pt in cut_pts if cut_at in cut_atoms]
         #actual_cp = get_actual_cut_pts(cross_mol,4,cut_pts)
         #print actual_cp
-        frags = frag_mol(cross_mol,cp_tup,bf='n',n=5)
+        frags = frag_mol(cross_mol,cp_tup,bf='n')
         temp_mol = frags[0]
         dum_ats = find_dummy_atoms(temp_mol)
         #print dum_ats
@@ -168,36 +167,31 @@ def return_cut_points(mol):
     #actual_cp = cut_pts[num-1] + cut_pts[-num]
     return cut_pts
 
-def frag_mol(mol,actual_cp,bf,n):
+def frag_mol(mol,actual_cp,bf):
     '''frag mol based on cutting points, add dummy atoms at points'''
     frags = []
     print actual_cp
     atom1 = actual_cp[0][0]
     atom2 = actual_cp[1][0]
-    rings = mol.GetRingInfo()
-    ring_ats = rings.AtomRings()[n-1]
-    print ring_ats
-    not_ir_ats = [item for sublist in actual_cp for item in sublist[1] if item not in ring_ats]
-    print not_ir_ats
-    #atom_diff = abs(atom1 - atom2)
+    atom_diff = abs(atom1 - atom2)
     #print atom_diff
     em = Chem.EditableMol(mol)
-    #if atom_diff == 1:
-    em.RemoveBond(atom1,not_ir_ats[0])
-    em.RemoveBond(atom2,not_ir_ats[1])
-    #else:
-    #    em.RemoveBond(atom1,actual_cp[0][1][1])
-    #    em.RemoveBond(atom2,actual_cp[1][1][0])
+    if atom_diff == 1:
+        em.RemoveBond(atom1,actual_cp[0][1][0])
+        em.RemoveBond(atom2,actual_cp[1][1][1])
+    else:
+        em.RemoveBond(atom1,actual_cp[0][1][1])
+        em.RemoveBond(atom2,actual_cp[1][1][0])
     new_at = em.AddAtom(Chem.Atom(0))
-    #if atom_diff == 1:
-    em.AddBond(not_ir_ats[0],new_at,Chem.BondType.AROMATIC)
-    #else:
-    #    em.AddBond(actual_cp[0][1][1],new_at,Chem.BondType.AROMATIC)
+    if atom_diff == 1:
+        em.AddBond(actual_cp[0][1][0],new_at,Chem.BondType.AROMATIC)
+    else:
+        em.AddBond(actual_cp[0][1][1],new_at,Chem.BondType.AROMATIC)
     new_at2 = em.AddAtom(Chem.Atom(0))
-    #if atom_diff == 1:
-    em.AddBond(not_ir_ats[1],new_at2,Chem.BondType.AROMATIC)
-    #else:
-    #    em.AddBond(actual_cp[1][1][0],new_at2,Chem.BondType.AROMATIC)
+    if atom_diff == 1:
+        em.AddBond(actual_cp[1][1][1],new_at2,Chem.BondType.AROMATIC)
+    else:
+        em.AddBond(actual_cp[1][1][0],new_at2,Chem.BondType.AROMATIC)
     em.AddBond(new_at,new_at2,Chem.BondType.AROMATIC)
     if bf == "y":
         side = random.randint(1,2)
@@ -218,34 +212,16 @@ def frag_mol(mol,actual_cp,bf,n):
 
 def join_mols(mol):
     '''join fragged mols, based on dummy atom positions'''
-    #dummy_atoms = find_dummy_atoms(mol)
+    dummy_atoms = find_dummy_atoms(mol)
     #print dummy_atoms 
     #print dummy_atoms[0][0]
-    #temp_em = Chem.EditableMol(mol)
-    #temp_em.RemoveAtom(dummy_atoms[-1][0])
-    #temp_em.RemoveAtom(dummy_atoms[-2][0])
-    #temp_em.ReplaceAtom(dummy_atoms[1][0],Chem.Atom(6))
-    #temp_em.ReplaceAtom(dummy_atoms[0][0],Chem.Atom(6))
-    #temp_em.AddBond(dummy_atoms[0][0],dummy_atoms[-2][1][0],Chem.BondType.AROMATIC)
-    #temp_em.AddBond(dummy_atoms[1][0],dummy_atoms[-1][1][0],Chem.BondType.AROMATIC)
-    #tm = temp_em.GetMol()
-    #Chem.SanitizeMol(tm)
-    dummy_atoms = find_dummy_atoms(mol)
-    print dummy_atoms 
-#print dummy_atoms[0][0]
     temp_em = Chem.EditableMol(mol)
-    temp_em.ReplaceAtom(dummy_atoms[1][0],Chem.Atom(6))
-    temp_em.ReplaceAtom(dummy_atoms[0][0],Chem.Atom(6))
-    temp_em.ReplaceAtom(dummy_atoms[-1][0],Chem.Atom(6))
-    temp_em.ReplaceAtom(dummy_atoms[-2][0],Chem.Atom(6))
-    #temp_em.AddBond(dummy_atoms[0][0],dummy_atoms[-1][0],Chem.BondType.AROMATIC)
-    #temp_em.AddBond(dummy_atoms[1][0],dummy_atoms[-2][0],Chem.BondType.AROMATIC)
-    #temp_em.ReplaceAtom(dummy_atoms[1][0],Chem.Atom(6))
-    #temp_em.ReplaceAtom(dummy_atoms[0][0],Chem.Atom(6))
-    temp_em.AddBond(dummy_atoms[0][0],dummy_atoms[-2][1][0],Chem.BondType.AROMATIC)
-    temp_em.AddBond(dummy_atoms[1][0],dummy_atoms[-1][1][0],Chem.BondType.AROMATIC)
     temp_em.RemoveAtom(dummy_atoms[-1][0])
     temp_em.RemoveAtom(dummy_atoms[-2][0])
+    temp_em.ReplaceAtom(dummy_atoms[1][0],Chem.Atom(6))
+    temp_em.ReplaceAtom(dummy_atoms[0][0],Chem.Atom(6))
+    temp_em.AddBond(dummy_atoms[0][0],dummy_atoms[-2][1][0],Chem.BondType.AROMATIC)
+    temp_em.AddBond(dummy_atoms[1][0],dummy_atoms[-1][1][0],Chem.BondType.AROMATIC)
     tm = temp_em.GetMol()
     Chem.SanitizeMol(tm)
     return tm
@@ -266,8 +242,8 @@ def single_point_crossover(m1,m2,bf):
     cp2 = return_cut_points(m2)
     actual_cp1 = get_actual_cut_pts(m1,n1,cp1) 
     actual_cp2 = get_actual_cut_pts(m2,n1,cp2)
-    frags1 = frag_mol(m1,actual_cp1,bf,n1)
-    frags2 = frag_mol(m2,actual_cp2,bf,n1)
+    frags1 = frag_mol(m1,actual_cp1,bf)
+    frags2 = frag_mol(m2,actual_cp2,bf)
     temp_mol1 = Chem.CombineMols(frags1[0],frags2[1])
     temp_mol2 = Chem.CombineMols(frags2[0],frags1[1])
     crossed_mol1 = join_mols(temp_mol1)
@@ -291,8 +267,8 @@ def double_point_crossover(m1,m2,bf):
     #print actual_cp1
     actual_cp2 = get_actual_cut_pts(m2,n2,cp2)
     #print actual_cp2
-    frags1 = frag_mol(m1,actual_cp1,bf,n1)
-    frags2 = frag_mol(m2,actual_cp2,bf,n2)
+    frags1 = frag_mol(m1,actual_cp1,bf)
+    frags2 = frag_mol(m2,actual_cp2,bf)
     print frags1
     print frags2
     fm =  [Chem.MolToSmiles(x,True) for x in frags1]
@@ -362,4 +338,3 @@ def ring_crossover(p1,p2):
         print "crossover is uniform"
         child_mols = uniform_crossover(m1,m2)
     return child_mols
-
