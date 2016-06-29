@@ -1,9 +1,26 @@
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from rdkit import DataStructs
+from rdkit.Chem.Fingerprints import FingerprintMols
 import random
 import cPickle
+import glob
+
+class MB():
+    '''simple class that is used for checking molecules are the same using the daylight fingerprint and Tanimoto similarity'''
+
+    def __init__(self, mol):
+        self.mol = mol
+        self.bitstring = FingerprintMols.FingerprintMol(mol)
+    
+    def __eq__(self,other):
+        return DataStructs.FingerprintSimilarity(self.bitstring,other.bitstring) == 1.0
+
+
+
 
 def chunks(l, n):
+    '''makes a list into n sized chunks'''
     n = max(1, n)
     return [l[i:i + n] for i in range(0, len(l), n)]
 
@@ -108,9 +125,9 @@ def com_generator_neutral_grndst(coords_list):
         name = str(i)+"_test" #set name, should still be in same order as original mol_list
         #com_f = open(name+".com", "w")
         gs = ["%mem=1GB",
-              "%nprocshared=8",
+              "%nprocshared=6",
               "%chk=molecule_0",
-              "#B3LYP/6-31G** FChk NoSymmetry Opt=(ModRedundant,)",
+              "#B3LYP/6-311+G** FChk NoSymmetry Opt=(ModRedundant,)",
               "", 
               "neutral minimisation "+name,
               "",
@@ -139,9 +156,9 @@ def com_generator_neg_mol_neg_geom(coords_list):
         mol_file = []
         #com_f = open(str(i)+"_test_neg.com", "w")
         gs = ["%mem=1GB",
-              "%nprocshared=8",
+              "%nprocshared=6",
               "%chk=molecule_0",
-              "#B3LYP/6-31G** FChk NoSymmetry Opt=(ModRedundant,)",
+              "#B3LYP/6-311+G** FChk NoSymmetry Opt=(ModRedundant,)",
               "", 
               "negative minimisation "+str(i)+"_test_neg",
               "",
@@ -167,9 +184,9 @@ def com_generator_neg_mol_neut_charge(coords_list):
         name = mol[0]+"_opt"
         mol_file = []
         gs = ["%mem=1GB",
-               "%nprocshared=8",
+               "%nprocshared=6",
                "%chk=molecule_0",
-               "#B3LYP/6-31G** FChk NoSymmetry",
+               "#B3LYP/6-311+G** FChk NoSymmetry",
                "",
                "single point energy "+name,
                "",
@@ -189,9 +206,9 @@ def com_generator_neut_mol_neg_charge(coords_list):
         name = mol[0]+"_opt"
         mol_file = []
         gs = ["%mem=1GB",
-              "%nprocshared=8",
+              "%nprocshared=6",
               "%chk=molecule_0",
-              "#B3LYP/6-31G** FChk NoSymmetry",
+              "#B3LYP/6-311+G** FChk NoSymmetry",
               "",
               "single point energy "+name,
               "",
@@ -320,9 +337,6 @@ def rank_selection(mol_list_en, elitism_rate, new_pop_size):
 
 def check_previous_gens(new_mol_list):
     '''checks previous results.p for identical molecules from crossover'''
-    import glob
-    import cPickle
-    unique_mols = []
     results_ps = glob.glob("*_results.p")
     prev_mols_list = []
     for re in results_ps:
@@ -330,7 +344,7 @@ def check_previous_gens(new_mol_list):
         for ml in ml_list:
             prev_mols_list.append(ml)
     print "previous molecules to check "+str(len(prev_mols_list))
-    smiles_en_list = [(Chem.MolToSmiles(ml),ml.GetProp("_Energy")) for ml in prev_mols_list]
+    smiles_en_list = [(Chem.MolToSmiles(ml),(ml.GetProp("_Fit"),ml.GetProp("_Energy"),ml.GetProp("_Ea"))) for ml in prev_mols_list] 
     smiles_en_dict = dict(smiles_en_list)
     unique_se = [(k,v) for k,v in smiles_en_dict.iteritems()]
     print "number of previous unique molecules "+str(len(unique_se))
@@ -344,7 +358,9 @@ def check_previous_gens(new_mol_list):
                 if i > 1:
                     break
                 else:
-                    mol.SetProp("_Energy", energy)
+                    mol.SetProp("_Energy", energy[1])
+                    mol.SetProp("_Fit", energy[0])
+                    mol.SetProp("_Ea", energy[2])
                     matches.append(mol)
             if i > 1:
                 break
@@ -357,6 +373,46 @@ def check_previous_gens(new_mol_list):
     new_matches_sorted = sorted(new_matches_list, key=lambda x: (int(x.GetProp("_Name").split("_")[0])))
     return new_matches_sorted 
 
+def check_previous_gens_fp(new_mol_list):
+    '''similar function to above but using molecule fps instead of smiles strings
+    should lead to fewer resonance structures making it through'''
+    results_ps = glob.glob("*_results.p")
+    print results_ps
+    prev_mols_list = []
+    for re in results_ps:
+        ml_list = cPickle.load( open(re, "rb" ) )
+        for ml in ml_list:
+            prev_mols_list.append(ml)
+    print "previous mols to check "+str(len(prev_mols_list))
+    uniq_prev_mols = list()
+    for pm in prev_mols_list:
+        pmb = MB(pm)
+        if pmb not in uniq_prev_mols:
+            uniq_prev_mols.append(pmb)
+    print "unique mols "+str(len(uniq_prev_mols))
+    matches = []
+    for mol in new_mol_list:
+        nmb = MB(mol)
+        for pmb in uniq_prev_mols:
+            if nmb == pmb:
+                pm = pmb.mol
+                fit = pm.GetProp("_Fit")
+                en = pm.GetProp("_Energy")
+                ea = pm.GetProp("_Ea")
+                mol.SetProp("_Fit", fit)
+                mol.SetProp("_Energy", en)
+                mol.SetProp("_Ea", ea)
+                matches.append(mol)
+    print "number of matches "+str(len(matches))
+    new_matches = matches + new_mol_list
+    new_matches_set = set(new_matches)
+    new_matches_list = list(new_matches_set)
+    uniq_ng = len(new_mol_list) - len(matches)
+    print "unqiue mols in gen "+str(uniq_ng)
+    new_matches_sorted = sorted(new_matches_list, key=lambda x: (int(x.GetProp("_Name").split("_")[0]))) 
+    return new_matches_sorted
+
+
 def init_gen_dumper(p_name,mol_list):
     '''dumps clean generation to pickle'''
     dump_list = []
@@ -365,6 +421,8 @@ def init_gen_dumper(p_name,mol_list):
         pm = AllChem.PropertyMol(m)
         pm.SetProp("_Name", name)
         pm.SetProp("_Energy", None)
+        pm.SetProp("_Ea", None)
+        pm.SetProp("_Fit", None)
         dump_list.append(pm)
     cPickle.dump(dump_list, open(p_name, "w+"))
 
@@ -381,12 +439,17 @@ def results_dumper(p_name,ml_sorted_by_en):
     '''dumps gen results to pickle'''
     gen_name = p_name.split(".")[0]
     dump_list = []
-    for mol,en in ml_sorted_by_en:
+    for data in ml_sorted_by_en:
+        mol = data[0]
         name = mol.GetProp("_Name")
         en = mol.GetProp("_Energy")
+        ea = mol.GetProp("_Ea")
+        fit = mol.GetProp("_Fit")
         pm = AllChem.PropertyMol(mol)
         pm.SetProp("_Name", name)
+        pm.SetProp("_Fit", fit)
         pm.SetProp("_Energy", en)
+        pm.SetProp("_Ea", ea)
         dump_list.append(pm)
     cPickle.dump(dump_list, open(gen_name+"_results.p", "w+"))
 
@@ -394,16 +457,28 @@ def new_gen_dumper(pop_size,ng,new_mols):
     '''dumps new gen to pickle, keeping energies from matched molecules'''
     dump_list = []
     for m in new_mols:
-         name = m.GetProp("_Name")
-         try:
-             energy = m.GetProp("_Energy")
-         except KeyError:
-             en = "None"
-             energy = m.SetProp("_Energy", en)
-         pm = AllChem.PropertyMol(m)
-         pm.SetProp("_Name", name)
-         pm.SetProp("_Energy", energy)
-         dump_list.append(pm)
+        name = m.GetProp("_Name")
+        try:
+            energy = m.GetProp("_Energy")
+        except KeyError:
+            en = "None"
+            energy = m.SetProp("_Energy", en)
+        try:
+            ea = m.GetProp("_Ea")
+        except KeyError:
+            eleca = "None"
+            ea = m.SetProp("_Ea", eleca)
+        try:
+            fit = m.GetProp("_Fit")
+        except KeyError:
+            fitness = "None"
+            fit = m.SetProp("_Fit", fitness)
+        pm = AllChem.PropertyMol(m)
+        pm.SetProp("_Name", name)
+        pm.SetProp("_Energy", energy)
+        pm.SetProp("_Fit", fit)
+        pm.SetProp("_Ea", ea)
+        dump_list.append(pm)
     new_gen_name = str(pop_size)+"_"+str(ng+1)+"_gen.p"
     cPickle.dump(dump_list, open(new_gen_name, "w+"))
 
@@ -418,16 +493,34 @@ def result_matcher(gen_result,mol_name_list,maximise):
             try:
                 print mol.GetProp("_Name"),gen_result[i]
                 mol.SetProp("_Energy",gen_result[i][1])
+                mol.SetProp("_Ea", gen_result[i][2])
                 i += 1
             except IndexError:
                 print "results list wrong length"
-        mol_en.append((mol,mol.GetProp("_Energy")))
+        mol_en.append((mol,mol.GetProp("_Energy"), mol.GetProp("_Ea")))
+    print mol_en
+    mol_fit = []
+    k1 = 1.0
+    k2 = 1.0
+    for mol in mol_en:
+        reorg = float(mol[1])
+        ea = float(mol[2])
+        if ea < 3.0:
+           k2 = 3 - ea
+        elif ea > 4.0:
+           k2 = ea - 4
+        elif 3 < ea < 4:
+           k2 = 0
+        fit = k1*reorg + k2*ea
+        mol[0].SetProp("_Fit", fit)
+        mol_fit.append((mol[0], fit, ea, reorg))
+    print maximise
     if maximise == "True":
         print " max = True"
         ml_sorted_by_en = sorted(mol_en, key=lambda tup: float(tup[1]),reverse=True)
     if maximise == "False":
         print "max = False"
-        ml_sorted_by_en = sorted(mol_en, key=lambda tup: float(tup[1]))
+        ml_sorted_by_en = sorted(mol_fit, key=lambda tup: float(tup[1]))
     return ml_sorted_by_en
 
 def make_pairs(crossover_mols):
@@ -442,4 +535,39 @@ def make_pairs(crossover_mols):
         else:
             pairs_set.append((p[0],p[1]))
     return pairs_set
+
+def write_overall_results(pop_size):
+    '''writes one pickle containing all unique molecules sampled during the search'''
+    overall = []
+    result_ps = glob.glob("*_results.p")
+    for rp in result_ps:
+        gen = rp.split("_")[1]
+        temp_list = []
+        mr_list = cPickle.load( open(rp, "rb" ) )
+        for mol in mr_list:
+            temp_list.append((mol,gen))
+        overall+=temp_list
+    print "total molecules sampled "+str(len(overall))
+    overall_rang = len(overall)
+    overall_sorted = sorted(overall, key=lambda tup: float(tup[0].GetProp("_Fit")))
+    for o in overall_sorted:
+        mol = o[0]
+        gen = o[1]
+        mol.SetProp("_gen", gen)
+        #bs = FingerprintMols.FingerprintMol(mol)
+        mol2 = MB(mol)
+        #print mol2.bitstring
+        #mol_set.add(mol2)
+        if mol2 not in mol_set:
+            mol_set.append(mol2)
+    print "total unique molecules "+str(len(mol_set))
+    final_mol_list = []
+    for m in mol_set:
+        mol = m.mol
+        gen = mol.GetProp("_gen")
+        name = mol.GetProp("_Name")
+        new_name = name+"_"+gen
+        mol.SetProp("_Name", new_name)
+        final_mol_list.append(mol)
+    cPickle.dump(final_mol_list, open(str(pop_size)+"_final.p", "w+"))
 

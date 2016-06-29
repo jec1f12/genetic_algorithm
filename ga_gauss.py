@@ -2,6 +2,15 @@ import celery
 from celery import group
 from tasks import *
 import ga_setup_selection
+#x = (float(energies[2][1]) - float(energies[1][1]))
+#        #print x
+#        y = (float(energies[3][1]) - float(energies[0][1]))
+##        #print y
+#        ea_au = (float(energies[0][1]) - float(energies[1][1]))
+#        reorg_en_au = x + y
+
+
+
 
 def reorg_en_calculator(energies):
     '''calculate reorganisation energies from run results'''
@@ -11,9 +20,11 @@ def reorg_en_calculator(energies):
         print molen
         x = (float(molen[1][1][1]) - float(molen[1][0][1]))
         y =  (float(molen[0][1][1]) - float(molen[0][0][1]))
+        ea_ha = (float(molen[0][0][1]) - float(molen[1][0][1]))
         re_ha = x + y
         re_ev = re_ha *27.212
-        result.append((molen[0][0][0], re_ev))
+        ea_ev = ea_ha *27.212
+        result.append((molen[0][0][0], re_ev, ea_ev))
     return result
 
 

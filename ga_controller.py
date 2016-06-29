@@ -22,7 +22,7 @@ parser.add_argument("-x_rate", "--crossover_rate", type=int, help="amount of eac
 parser.add_argument("-e_rate", "--elitism_rate", type=int, help="amount of each generation produced by elitism (%%)", default=10)
 parser.add_argument("-n_gen", "--number_of_gens", type=int, help="how many generations to run for", default=50)
 parser.add_argument("-restart", "--restart_ga", type=int, help="restart ga from this generation",default=None)
-parser.add_argument("-gauss_calc", "--gauss_calc",type=str,help="which molecular property you want to optimise, reorg_en, hl_diff, max_dipole,lumo",default="reorg_en")
+parser.add_argument("-gauss_calc", "--gauss_calc",type=str,help="which molecular property you want to optimise, reorg_en, hl_diff, max_dipole,lumo,reorg_en+ea",default="reorg_en")
 parser.add_argument("-work_dir", "--work_dir",type=str,help="where to run the GA",default=".")
 
 
@@ -42,15 +42,22 @@ for ng in number_of_gens:
     p_name = gen_name+"_gen.p"
     if ng == 1:
         #initial setup, pop_size, mol_coords and com_files
-        smiles_string = 'c1ccc2cc3cc4cc5ccccc5cc4cc3cc2c1'
-        pop = ga_setup_selection.generate_initial_population(smiles_string,args.population_size,args.nitrogen_number)
+        smiles_string = 'c1ccc2cc3cc4cc5cc6ccccc6cc5cc4cc3cc2c1'
+        mixed_pop = []
+        n_numbers = [6,7,8,9,10]
+        for n in n_numbers:
+            pop = ga_setup_selection.generate_initial_population(smiles_string,20,n)
+            print len(pop)
+            mixed_pop += pop
+        print len(mixed_pop)
+#        pop = ga_setup_selection.generate_initial_population(smiles_string,args.population_size,args.nitrogen_number)
         #print len(pop)
-        mol_lst = ga_setup_selection.mol_name_maker(pop)
+        mol_lst = ga_setup_selection.mol_name_maker(mixed_pop)
         #writing generation .p
         ga_setup_selection.init_gen_dumper(p_name,mol_lst)
         #collecting and running coms
         all_mol_coords = ga_setup_selection.coords_generator(mol_lst)
-        if args.gauss_calc == "reorg_en":
+        if args.gauss_calc == "reorg_en" or "reorg_en+ea":
             gen_result = ga_gauss.reorg_en_calc(all_mol_coords)
         if args.gauss_calc == "hl_diff":
             gen_result = ga_gauss.hl_diff_calc(all_mol_coords)
@@ -61,9 +68,9 @@ for ng in number_of_gens:
         print gen_result
         #matching up mol objects and energies
         mol_name_list = ga_setup_selection.gen_loader(p_name)
-        if args.gauss_calc == "lumo" or "max_dipole" or "hl_diff":
-            ml_sorted_by_en = ga_setup_selection.result_matcher(gen_result,mol_name_list,maximise="True")
-        if args.gauss_calc == "reorg_en":
+        #if args.gauss_calc == "lumo" or "max_dipole" or "hl_diff":
+        #    ml_sorted_by_en = ga_setup_selection.result_matcher(gen_result,mol_name_list,maximise="True")
+        if args.gauss_calc in ("reorg_en", "reorg_en+ea"):
             ml_sorted_by_en = ga_setup_selection.result_matcher(gen_result,mol_name_list,maximise="False") 
         print ml_sorted_by_en
         #writing results pickle
@@ -91,7 +98,7 @@ for ng in number_of_gens:
             nm.SetProp("_Name", str(i)+"_test")
             mol_list_2.append(nm)
         #removing duplicates and writing new generation
-        new_mols = ga_setup_selection.check_previous_gens(mol_list_2)
+        new_mols = ga_setup_selection.check_previous_gens_fp(mol_list_2)
         ga_setup_selection.new_gen_dumper(args.population_size,ng,new_mols)
     else:
         mol_list = cPickle.load(open(p_name, "rb" ))
@@ -104,7 +111,7 @@ for ng in number_of_gens:
             broadcast("shutdown")
             exit()
         all_mol_coords = ga_setup_selection.coords_generator(run_mols)
-        if args.gauss_calc == "reorg_en":
+        if args.gauss_calc == "reorg_en" or "reorg_en+ea":
             gen_result = ga_gauss.reorg_en_calc(all_mol_coords)
         if args.gauss_calc == "hl_diff":
             gen_result = ga_gauss.hl_diff_calc(all_mol_coords)
@@ -112,19 +119,19 @@ for ng in number_of_gens:
             gen_result = ga_gauss.max_dipole_calc(all_mol_coords)
         if args.gauss_calc == "lumo":
             gen_result = ga_gauss.lumo_calc(all_mol_coords)
-        print gen_result
-        if args.gauss_calc == "lumo" or "max_dipole" or "hl_diff":
-            ml_sorted_by_en = ga_setup_selection.result_matcher(gen_result,mol_list,maximise="True")
-        if args.gauss_calc == "reorg_en":
+        #print gen_result
+        #if args.gauss_calc == "lumo" or "max_dipole" or "hl_diff":
+        #    ml_sorted_by_en = ga_setup_selection.result_matcher(gen_result,mol_list,maximise="True")
+        if args.gauss_calc in ("reorg_en", "reorg_en+ea"):
             ml_sorted_by_en = ga_setup_selection.result_matcher(gen_result,mol_list,maximise="False")
         print ml_sorted_by_en
         #writing results pickle
         ga_setup_selection.results_dumper(p_name,ml_sorted_by_en)
         new_min = float(ml_sorted_by_en[0][1])
-        if new_min < 0.1333:
-            print "reached min, stopping"
-            broadcast("shutdown")
-            exit()
+        #if new_min > -0.06690:
+        #    print "reached min, stopping"
+        #    broadcast("shutdown")
+        #    exit()
         #setting crossover/elitism sizes
         crossover_size = int(args.population_size) * args.crossover_rate/100
         elite_size = int(args.population_size) * args.elitism_rate/100
@@ -149,6 +156,13 @@ for ng in number_of_gens:
             nm.SetProp("_Name", str(i)+"_test")
             mol_list_2.append(nm)
         #removing duplicates and writing new generation
-        new_mols = ga_setup_selection.check_previous_gens(mol_list_2)
+        new_mols = ga_setup_selection.check_previous_gens_fp(mol_list_2)
         ga_setup_selection.new_gen_dumper(args.population_size,ng,new_mols)
 
+
+print "GA Finishing, shutting down workers"
+broadcast("shutdown")
+print "Writing overall results.p"
+ga_setup_selection.write_overall_results(args.population_size)
+print "Done, exiting"
+exit()

@@ -5,7 +5,7 @@ import shutil
 import ga_tasks
 
 
-app = Celery('tasks', backend='amqp' ,broker='amqp://myuser:mypassword@localhost:20100/myvhost')
+app = Celery('tasks', backend='amqp' ,broker='amqp://myuser:mypassword@localhost:20100/myvhost3')
 import celeryconfig
 app.config_from_object(celeryconfig)
 
