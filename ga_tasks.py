@@ -1,5 +1,6 @@
-
+##this is the task file that is also replicated on iridis, it's here in case a run is ever performed on the same computer most of the functions are self explanatory
 def com_writer(com_file,name):
+    '''com file is an object containing all the coords and gauss arguments'''
     com = name+".com"
     com_f = open(com, "w")
     for line in com_file:
@@ -12,6 +13,7 @@ def com_writer(com_file,name):
     return com 
 
 def energy_grabber(outfile):
+    '''grabs the final energy from a gauss log file'''
     f = open(outfile, "r")
     f_list = list(f)
     f_list.reverse()
@@ -25,6 +27,7 @@ def energy_grabber(outfile):
     return energy
 
 def structure_grabber(outfile):
+    '''grabs an optimised structure from a gauss log file'''
     f = open(outfile, "r")
     f_list = list(f)
     f_list.reverse()
@@ -63,6 +66,7 @@ def structure_grabber(outfile):
     return structure
  
 def hl_grabber(outfile):
+    '''gets homo lumo difference'''
     f = open(outfile, "r")
     f_list = list(f)
     f_list.reverse()
@@ -81,6 +85,7 @@ def hl_grabber(outfile):
     return hl_diff
 
 def lumo_grabber(outfile):
+    '''gets lumo energy'''
     f = open(outfile, "r")
     f_list = list(f)
     f_list.reverse()
@@ -98,6 +103,7 @@ def lumo_grabber(outfile):
     return lumo_en
 
 def max_d_grabber(outfile):
+    '''gets maximum dipole moment'''
     f = open(outfile, "r")
     f_list = list(f)
     f_list.reverse()
