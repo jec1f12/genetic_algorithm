@@ -1,4 +1,68 @@
 ##this is the task file that is also replicated on iridis, it's here in case a run is ever performed on the same computer most of the functions are self explanatory
+def res_grabber(name):
+    f = open(name+".res")
+    res_list = []
+    for line in f:
+        res_list.append(line)
+    return res_list
+
+
+def get_global_minimum(name):
+    import subprocess as sb
+    import os
+    os.chdir("../"+name+"_results")
+    print "getting global minimum for "+name
+    output = sb.check_output(["python /scratch/jec1f12/CSPy_bt/CSPy/cspy/process_data.py -rp *.p -tr final_energy -trp -nc 10 -rpm secondary/csp_data.p"],shell=True)
+    output_2 =  output.split("\n")
+    gm = output_2[7]
+    os.chdir("../"+name+"_run")
+    return gm
+
+def get_gm_name(name):
+    import subprocess as sb
+    print "getting highest sobol name for "+name
+    import os
+    os.chdir("../"+name+"_results")
+    output = sb.check_output(["python /scratch/jec1f12/CSPy_bt/CSPy/cspy/process_data.py -rp *.p -tr name -trp -rpm secondary/csp_data.p"],shell=True)
+    output_2 =  output.split("\n")[7:-3]
+    output_2_sorted = sorted(output_2, key=lambda o: int(o.split("_")[4]),reverse=True)
+    gm_name = output_2_sorted[0]
+    os.chdir("../"+name+"_run")
+    return gm_name
+
+
+def move_results(name):
+    import subprocess as sb
+    import datetime
+    import os
+    now = datetime.datetime.now()
+    nh = now.hour
+    nm = now.minute
+    p_name = name+"_"+str(nh)+"_"+str(nm)+"_results.p"
+    print "moving results for "+name
+    try:
+        os.mkdir("../"+name+"_results")
+    except OSError:
+        pass
+    sb.call(("python /scratch/jec1f12/CSPy_bt/CSPy/cspy/process_data.py -rp *.zip -wcpt valid -wcp "+p_name+" -rpm secondary/csp_data.p"),shell=True)
+    sb.call(("mv "+p_name+" ../"+name+"_results"),shell=True)
+    return
+
+
+def xyz_writer(xyz_file,name):
+    xyz = name+".xyz"
+    xyz_f = open(xyz, "w")
+    for line in xyz_file:
+        if str(line).startswith("("):
+             xyz_f.write("%6s %13.6f %13.6f %13.6f\n"% (line[0],float(line[1][0]),float(line[1][1]),float(line[1][2])))
+        else:
+             xyz_f.write(str(line))
+    xyz_f.write(3*"\n")
+    xyz_f.close()
+    return xyz
+
+
+
 def com_writer(com_file,name):
     '''com file is an object containing all the coords and gauss arguments'''
     com = name+".com"

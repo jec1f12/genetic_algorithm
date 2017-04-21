@@ -40,7 +40,7 @@ class ga_setup_quick_test(unittest.TestCase):
         
     def test_tournament(self):
         from ga_setup_selection import tournament_selection
-         
+        print "testing tournament selection"         
 
 
 
