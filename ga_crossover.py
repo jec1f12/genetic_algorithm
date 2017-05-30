@@ -3,6 +3,10 @@ import copy
 from ga_setup_selection import mutator
 from rdkit import Chem
 
+####atomic site crossover functions, this crossover uses positions on outside of fused ring system as the genome to be crossed over
+
+
+
 def crossover_chooser(crossover_choice):
     '''just returns a value based on the random numbers for crossover_choice'''
     if crossover_choice <= 30:
@@ -217,7 +221,8 @@ def n_counter(mol):
     return n_pos
 
 def crossover_pair_fixed(mol_1,mol_2):
-    '''this function crosses over two molecules using only the N positions as the genome, allowing the N to be fixed'''   
+    '''this function crosses over two molecules using only the N positions as the genome, allowing the N to be fixed
+       usually GA is run with varying'''   
     n_number = 5
     parent_1 =  Chem.MolToSmiles(mol_1)
     parent_2 =  Chem.MolToSmiles(mol_2)

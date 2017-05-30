@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description="-"*78 + "Genetic algorithm control
 parser.add_argument("-pop", "--population_size", type=int, help="Size of initial population", default=100)
 parser.add_argument("-n_number", "--nitrogen_number", type=int, help="Number of intial nitrogens placed into molecule", default=5)
 parser.add_argument("-mixed_n", "--mixed_nitrogen_numbers", action="store_true", help="For creating a population with mixed numbers of nitrogen substitution", default=None)
-parser.add_argument("-x_type", "--crossover_type", type=str, help="Type of crossover used, either fixed N/varying or ring crossover", default="ring")
+parser.add_argument("-x_type", "--crossover_type", type=str, help="Type of crossover used, either atomic or ring crossover", default="ring")
 parser.add_argument("-x_rate", "--crossover_rate", type=int, help="Amount of each generation produced by crossover (%%)", default=90)
 parser.add_argument("-e_rate", "--elitism_rate", type=int, help="Amount of each generation produced by elitism (%%)", default=10)
 parser.add_argument("-n_gen", "--number_of_gens", type=int, help="How many generations to run for", default=50)
@@ -105,12 +105,17 @@ for ng in number_of_gens:
         children = []
         for p in pairs_set:#send each pair to crossover
             while True:
-                try:
-                    kids = ga_ring_crossover.ring_crossover(p[0],p[1])
+                if args.crossover_type == "ring":
+                    try:
+                        kids = ga_ring_crossover.ring_crossover(p[0],p[1])
+                        children+=kids
+                        break
+                    except (IndexError,RuntimeError,ValueError):#dirty hack as sometimes crossover throws up invalid molecules with 5 rings
+                       continue
+                if args.crossover_type == "atomic":
+                    kids = ga_crossover.crossover_pair_varying(p[0],p[1])
                     children+=kids
                     break
-                except (IndexError,RuntimeError,ValueError):#dirty hack as sometimes crossover throws up invalid molecules with 5 rings
-                    continue  
         #combining elite and crossed over mols
         mol_list_2 = []
         new_gen = elite_mols + children
@@ -127,11 +132,11 @@ for ng in number_of_gens:
         run_mols = [mol for mol in mol_list if mol.GetProp("_Energy") == "None"]#runs only those molecules which have no calculated property
         if args.csp:
             add_mols = [mol for mol in mol_list if mol.GetProp("_Energy") != "None"]
-            if len(add_mols) > 0:
+            if len(add_mols) > 0: #all code below is setting up molecules to have their csp extended 
                 print "number of mols to have csp extended "+str(len(add_mols))
                 name_list = [mol.GetProp("_Name") for mol in add_mols]
                 print name_list
-                actual_add_mols = {x.GetProp("_Name"): x for x in add_mols}.values()
+                actual_add_mols = {x.GetProp("_Name"): x for x in add_mols}.values() #gets only unique names
                 sorted_aam = sorted(actual_add_mols, key=lambda mol: (int(mol.GetProp("_Name").split("_")[0]))) 
                 saam_name_list = [mol.GetProp("_Name") for mol in sorted_aam]
                 print saam_name_list
@@ -141,7 +146,7 @@ for ng in number_of_gens:
                 add_mol_result = ga_csp.add_mol_csp(mult_result,gm_names)
                 print add_mol_result
                 add_mol_full_result = [] 
-                for n in name_list:
+                for n in name_list: #matching results to duplicates not run
                     for amr in add_mol_result:
                         if n == amr[0]:
                             add_mol_full_result.append(amr)
@@ -179,10 +184,6 @@ for ng in number_of_gens:
         #writing results pickle
         ga_setup_selection.results_dumper(p_name,ml_sorted_by_en)
         new_min = float(ml_sorted_by_en[0][1])
-        #if new_min > -0.06690:
-        #    print "reached min, stopping"
-        #    broadcast("shutdown")
-        #    exit()
         #setting crossover/elitism sizes
         crossover_size = int(args.population_size) * args.crossover_rate/100
         elite_size = int(args.population_size) * args.elitism_rate/100
@@ -192,13 +193,17 @@ for ng in number_of_gens:
         pairs_set = ga_setup_selection.make_pairs(crossover_mols)
         children = []
         for p in pairs_set:
-            while True:
-                try:
-                    kids = ga_ring_crossover.ring_crossover(p[0],p[1])
-                    children+=kids
-                    break
-                except (IndexError,RuntimeError,ValueError):
-                    continue
+        while True:
+           if args.crossover_type == "ring":
+               try:
+                   kids = ga_ring_crossover.ring_crossover(p[0],p[1])
+                   children+=kids
+                   break
+               except (IndexError,RuntimeError,ValueError):#dirty hack as sometimes crossover throws up invalid molecules with 5 rings
+                  continue
+           if args.crossover_type == "atomic":
+               kids = ga_crossover.crossover_pair_varying(p[0],p[1])
+               children+=kids
         print len(children)
         #combining elite and crossed over mols
         mol_list_2 = []

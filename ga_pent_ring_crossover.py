@@ -23,19 +23,19 @@ def fragment_total(mol):
     '''fragments molecule into all constituent rings, returns a list of each ring'''
     frags = []
     origmol = mol
-    for x in range(0,5):
+    for x in range(0,5):#loop over number of rings
         if x == 4:
             tempmol = origmol
-            cut_pts = return_cut_points(tempmol)
+            cut_pts = return_cut_points(tempmol)#get all cutpoints in a molecule
             print cut_pts
-            cp = get_actual_cut_pts(tempmol,(x),cut_pts)
+            cp = get_actual_cut_pts(tempmol,(x),cut_pts)#get correct cutpoints for ring number
             print cp
-            frag = frag_mol(tempmol,cp,bf='n')
+            frag = frag_mol(tempmol,cp,bf='n')#break ring off molecule
             frags.append(frag[1])
             break
-        if x == 0:
+        if x == 0:#skip breaking first ring for now
             tempmol = origmol
-        r = tempmol.GetRingInfo()
+        r = tempmol.GetRingInfo() #get first ring
         #print r.NumRings()
         cut_pts = return_cut_points(tempmol)
         print cut_pts
@@ -50,11 +50,11 @@ def fragment_total(mol):
 def join_total(frags):
     '''joins list of multiple fragments together, returns new mol'''
     print len(frags)
-    join_pts = [0,1,2,3]
+    join_pts = [0,1,2,3] #similar loop to fragment total
     for x in join_pts:
         #print x
         if x == 0:
-            temp_mol = Chem.CombineMols(frags[x],frags[x+1])
+            temp_mol = Chem.CombineMols(frags[x],frags[x+1])#makes one molecule object out of two separate ones
             atch_mol = join_mols(temp_mol)
             #r = atch_mol.GetRingInfo()
             #print r.NumRings()
@@ -78,74 +78,49 @@ def ring_fixer(cross_mol,parent_mol):
     num_rings = rings.NumRings()
     print "number of rings = "+str(num_rings)
     if num_rings == 5:
-        new_mol = cross_mol
+        new_mol = cross_mol#molecule doesn't need fixing
     if num_rings < 5:
-        ring_ats = rings.AtomRings()[num_rings-1]
-        #print ring_ats
+        ring_ats = rings.AtomRings()[num_rings-1]#get ring atoms for last ring
         end_ats = []
         for atom in cross_mol.GetAtoms():
             if atom.GetIdx() in ring_ats:
-                if len(atom.GetBonds()) == 2:
+                if len(atom.GetBonds()) == 2:#get end atoms of last ring
                      end_ats.append(atom.GetIdx())
-        #print end_ats
-        #print num_rings
         cp = return_cut_points(parent_mol)
-        #print cp
         ring_cp = [cp[num_rings-1] + cp[-num_rings]]
         print ring_cp
-        #actual_cp =  (ring_cp[0]) + (ring_cp[1])
         actual_cp = get_actual_cut_pts(parent_mol,num_rings,cp)
         print actual_cp
-        #add_ring_cp = get_actual_cut_pts(parent_mol,num_rings-1,cp)
-        additional_ring = frag_mol(parent_mol,actual_cp,bf='n')[1]
-        #print Chem.MolToSmiles(cross_mol)
-        #print Chem.MolToSmiles(additional_ring)
+        additional_ring = frag_mol(parent_mol,actual_cp,bf='n')[1]#get additional ring from parent mol
         te2_m = Chem.EditableMol(cross_mol)
-        te2_m.ReplaceAtom(end_ats[1], Chem.Atom(0))
+        te2_m.ReplaceAtom(end_ats[1], Chem.Atom(0))#replacing with dummy atoms allows for joining
         te2_m.ReplaceAtom(end_ats[2], Chem.Atom(0))
         tm2 = te2_m.GetMol()
         Chem.SanitizeMol(tm2)
-        #print Chem.MolToSmiles(tm2)
         temp_mol = Chem.CombineMols(tm2,additional_ring)
-        #new_mol = cross_mol
         new_mol = join_mols(temp_mol)
     if num_rings > 5:
-        #print num_rings
         cut_pts = return_cut_points(cross_mol)
-        #print cut_pts
-        ring_ats = rings.AtomRings()[5]
-        #if n_diff >=2:
-        #    ring_ats = rings.AtomRings()[4]#num_rings-1]
-        #print ring_ats
+        ring_ats = rings.AtomRings()[5]#get ring ats for 5th ring
         cut_atoms = []
         cut_atoms.append(ring_ats[-1])
         cut_atoms.append(ring_ats[-2])
         print cut_atoms
         cp_tup = [(cut_at,cut_pt) for cut_at,cut_pt in cut_pts if cut_at in cut_atoms]
-        #actual_cp = get_actual_cut_pts(cross_mol,4,cut_pts)
-        #print actual_cp
-        frags = frag_mol(cross_mol,cp_tup,bf='n')
+        frags = frag_mol(cross_mol,cp_tup,bf='n')#break at 5th ring
         temp_mol = frags[0]
         dum_ats = find_dummy_atoms(temp_mol)
-        #print dum_ats
-        #print dum_ats[0][1][0]
-        #print dum_ats[1][1][0]
         te_m = Chem.EditableMol(temp_mol)
-        rem_at = te_m.RemoveAtom(dum_ats[1][0])
+        rem_at = te_m.RemoveAtom(dum_ats[1][0])#remove dummy atoms
         rem_at2 = te_m.RemoveAtom(dum_ats[0][0])
         new_at = te_m.AddAtom(Chem.Atom(6))## these new atoms are added onto the end of the atom idx
         new_at2 = te_m.AddAtom(Chem.Atom(6))##all orig atoms are moved down by 1
-        #print new_at
-        #print new_at2
         te_m.AddBond(new_at,dum_ats[0][1][0],Chem.BondType.AROMATIC)
-        te_m.AddBond(new_at,new_at2,Chem.BondType.AROMATIC)
+        te_m.AddBond(new_at,new_at2,Chem.BondType.AROMATIC)#need to remake aromatic bonds for new carbon atoms
         te_m.AddBond(new_at2,dum_ats[-1][-1][1],Chem.BondType.AROMATIC)
         tm = te_m.GetMol()
         Chem.SanitizeMol(tm)
-        #trings = tm.GetRingInfo()
-        #tnr = trings.NumRings()
         new_mol = tm
-        #prop_cross.append(new_mol)
     return new_mol
 
 
@@ -173,7 +148,7 @@ def frag_mol(mol,actual_cp,bf):
     print actual_cp
     atom1 = actual_cp[0][0]
     atom2 = actual_cp[1][0]
-    atom_diff = abs(atom1 - atom2)
+    atom_diff = abs(atom1 - atom2)#sometimes atom ordering is a bit iffy so atom diff controls bonds being created correctly
     #print atom_diff
     em = Chem.EditableMol(mol)
     if atom_diff == 1:
@@ -193,9 +168,9 @@ def frag_mol(mol,actual_cp,bf):
     else:
         em.AddBond(actual_cp[1][1][0],new_at2,Chem.BondType.AROMATIC)
     em.AddBond(new_at,new_at2,Chem.BondType.AROMATIC)
-    if bf == "y":
+    if bf == "y":#branch factor
         side = random.randint(1,2)
-        print side
+        print side#side controls if dummy atoms are moved up or down the ring
         if side == 1:
             em.ReplaceAtom(atom1, Chem.Atom(0))
             em.ReplaceAtom(actual_cp[0][1][0], Chem.Atom(0))
@@ -228,6 +203,7 @@ def join_mols(mol):
 
 
 def get_actual_cut_pts(mol,n,cut_pts):
+    '''returns cut points for a specified ring'''
     rings = mol.GetRingInfo()
     ring_ats = rings.AtomRings()[n]
     actual_ca = ring_ats[-2:]

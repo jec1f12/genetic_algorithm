@@ -1,7 +1,6 @@
 import random
 from rdkit import Chem
 from rdkit.Chem import AllChem
-import random
 
 def find_dummy_atoms(mol):
     '''finds the dummy atoms in a mol, returns atom ids'''

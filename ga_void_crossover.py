@@ -4,7 +4,7 @@ from rdkit.Chem import AllChem
 from rdkit import DataStructs
 from rdkit.Chem.Fingerprints import FingerprintMols
 
-
+##crossover for void GA that will probably not make it 
 
 
 class MB():#class uses python eq method, if the fingerprint == 1 the molecules are identical
@@ -20,20 +20,21 @@ class MB():#class uses python eq method, if the fingerprint == 1 the molecules a
 
 
 def mutator_void(mol):
+    '''function for mutating a biphenyl through the addition of substituents outside the ring system, returns a mutated mol'''
     import random
-    atom_sites = [0,4,9,11,14,17,18,19,20,21]
-    subs_list = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,7,7,7,6,6,6,6,6,6,6,9,17,35,53]
+    atom_sites = [0,4,9,11,14,17,18,19,20,21]#these are the atom numbers for the ring substituents
+    subs_list = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,7,7,7,6,6,6,6,6,6,6,9,17,35,53]#atomic number of substituents
     carbon_subs_smiles = ['C[Si](C)(C)(C)','C(C)(C)(C)','C[Si](CC)(CC)(CC)','C(F)(F)(F)'
-                      ,'C#N','C#C', 'C']
-    nitrogen_subs_smiles = ['*[H]','*(C)(C)','*(=O)(=O)']
-    pmH = Chem.AddHs(mol)
+                      ,'C#N','C#C', 'C']#smiles for carbon subs
+    nitrogen_subs_smiles = ['*[H]','*(C)(C)','*(=O)(=O)']#nitrogen subs
+    pmH = Chem.AddHs(mol)#this ensures hydrogens are there so all sites can be mutated
     for atom in atom_sites:
         replacement = random.choice(subs_list)
         print atom, replacement
-        if replacement == 6:
+        if replacement == 6:#for carbon and nitrogen specific bonding must be used for various subs
             print "carbon"
             carbon_sub = random.choice(carbon_subs_smiles)
-            if carbon_sub == 'C':
+            if carbon_sub == 'C':#methyl is easiest
                 pmHe = Chem.EditableMol(pmH)
                 pmHe.ReplaceAtom(atom, Chem.Atom(6))
                 tm2 = pmHe.GetMol()
@@ -46,18 +47,18 @@ def mutator_void(mol):
                 pmHe = Chem.EditableMol(comb_mol)
                 pmHe.ReplaceAtom(atom, Chem.Atom(6))
                 if '[Si]' in carbon_sub:
-                    pmHe.AddBond(atom,frags[1][0],Chem.BondType.TRIPLE)
+                    pmHe.AddBond(atom,frags[1][0],Chem.BondType.TRIPLE)#bond from first atom in subs to atomic site
                     tm2 = pmHe.GetMol()
                     Chem.SanitizeMol(tm2)
                     pmH = tm2
                 elif '#' in carbon_sub:
-                    pmHe.AddBond(atom,frags[1][1],Chem.BondType.TRIPLE)
+                    pmHe.AddBond(atom,frags[1][1],Chem.BondType.TRIPLE)#bond from atom to second atom in subs
                     pmHe.RemoveAtom(frags[1][0])
                     tm2 = pmHe.GetMol()
                     Chem.SanitizeMol(tm2)
                     pmH = tm2
                 else:
-                    pmHe.AddBond(atom,frags[1][1],Chem.BondType.SINGLE)
+                    pmHe.AddBond(atom,frags[1][1],Chem.BondType.SINGLE)#all bonds need to be specified for tetra subs
                     pmHe.AddBond(atom,frags[1][2],Chem.BondType.SINGLE)
                     pmHe.AddBond(atom,frags[1][3],Chem.BondType.SINGLE)
                     pmHe.RemoveAtom(frags[1][0])
@@ -73,9 +74,9 @@ def mutator_void(mol):
             frags = Chem.GetMolFrags(comb_mol)
             pmHe = Chem.EditableMol(comb_mol)
             pmHe.ReplaceAtom(atom,Chem.Atom(7))
-            if "O" in nitro_sub:
-                pmHe.AddBond(atom,frags[1][1],Chem.BondType.DOUBLE)
-                pmHe.AddBond(atom,frags[1][2],Chem.BondType.DOUBLE)
+            if "O" in nitro_sub:#like carbon bonding rules need to be followed
+                pmHe.AddBond(atom,frags[1][1],Chem.BondType.DOUBLE)#specifically rdkits NO2 bonding info
+                pmHe.AddBond(atom,frags[1][2],Chem.BondType.DOUBLE)#this does result in the correct ionic form once sanitised
                 pmHe.RemoveAtom(frags[1][0])
                 tm2 = pmHe.GetMol()
                 Chem.SanitizeMol(tm2)
@@ -95,7 +96,7 @@ def mutator_void(mol):
                 pmH = tm2
         else:
             pmHe = Chem.EditableMol(pmH)
-            pmHe.ReplaceAtom(atom,Chem.Atom(replacement))
+            pmHe.ReplaceAtom(atom,Chem.Atom(replacement))#simplest for single atom subs just replace
             tm2 = pmHe.GetMol()
             Chem.SanitizeMol(tm2)
             pmH = tm2
@@ -103,6 +104,7 @@ def mutator_void(mol):
     
     
 def generate_initial_population_void(mol,pop_size):
+    '''generates an initial biphenyl population and checks for uniqueness using molecular fps'''
     population_init = []
     population = []
     while len(population_init) < pop_size:
@@ -116,16 +118,17 @@ def generate_initial_population_void(mol,pop_size):
     return population
 
 def get_subs(mol):
+    '''gets subs list from a biphenyl, list returned contains atomic site, atom type and mol object of sub'''
     molh = Chem.AddHs(mol)
     rings = molh.GetRingInfo()
     ring_ats = rings.AtomRings()
-    flat_ring_ats =  sum(ring_ats, ())
+    flat_ring_ats =  sum(ring_ats, ())#just makes a flat list out of the pair of tuples returned by ring.AtomRings()
     list_atom_sites = []
     for ring_at in flat_ring_ats:
-        n = [n.GetIdx() for n in molh.GetAtomWithIdx(ring_at).GetNeighbors()]
-        non_ring_n = [nrn for nrn in n if nrn not in flat_ring_ats]
+        n = [n.GetIdx() for n in molh.GetAtomWithIdx(ring_at).GetNeighbors()]#get neighbours for all our ring atoms
+        non_ring_n = [nrn for nrn in n if nrn not in flat_ring_ats]#gets non ring neighbours
         list_atom_sites.append(non_ring_n)
-    actual_atom_sites = [atom for sublist in list_atom_sites for atom in sublist]
+    actual_atom_sites = [atom for sublist in list_atom_sites for atom in sublist]#gets a list of all our substituent atoms
     print actual_atom_sites
     subs_list = []
     for at_s in actual_atom_sites:
@@ -136,7 +139,7 @@ def get_subs(mol):
                 #print n
                 mol_e = Chem.EditableMol(mol)
                 mol_e.RemoveBond(n[0],atoms.GetIdx())
-                mol_e.ReplaceAtom(atoms.GetIdx(),Chem.Atom(0))
+                mol_e.ReplaceAtom(atoms.GetIdx(),Chem.Atom(0))#dummy atoms allow us to pass sanitisation steps 
                 broke_mol = mol_e.GetMol()
                 Chem.SanitizeMol(broke_mol)
                 frags = Chem.GetMolFrags(broke_mol,asMols=True)
@@ -147,6 +150,7 @@ def get_subs(mol):
     return subs_list
 
 def non_ring_atoms(mol):
+    '''function that returns the non ring atoms of a molecule'''
     rings = mol.GetRingInfo()
     ring_ats = rings.AtomRings()
     test_2 =  sum(ring_ats, ())
@@ -169,6 +173,7 @@ def non_ring_atoms(mol):
     return sorted_aas
 
 def add_subs2(mol,subs_list):
+    '''function that adds all the subs in subs_list to a molecule'''
     i = 0
     blank_molh = Chem.AddHs(mol)
     sort_aas = non_ring_atoms(blank_molh)
@@ -210,6 +215,7 @@ def add_subs2(mol,subs_list):
     return blank_molh
 
 def dummy_atom_remover_non_ring(mol):
+    '''removing dummy atoms added in by subs adder is a two step process, non rings are replaced afterwards'''
     nring_dum_ats = []
     for atoms in mol.GetAtoms():
         if atoms.GetAtomicNum() == 0:
@@ -236,6 +242,7 @@ def dummy_atom_remover_non_ring(mol):
     return mol
 
 def dummy_atom_remover_ring(mol):
+    '''this replaces all the dummy atoms inside the biphenyl rings'''
     rings = mol.GetRingInfo()
     ring_ats = rings.AtomRings()
     flat_rats =  sum(ring_ats, ())
